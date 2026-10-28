@@ -1,26 +1,51 @@
-name: Build APK
+name: Build Scan Tools APK
 
 on:
   push:
+    paths-ignore:
+      - 'README.md'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Unpack source
+        run: |
+          rm -rf src && mkdir src
+          unzip -o -q ScanTools.zip -d src
+          if [ -d src/ScanTools ]; then shopt -s dotglob; mv src/ScanTools/* src/; rmdir src/ScanTools; fi
+          ls src
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
+
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build
+
+      - name: Build APK
+        working-directory: src
         run: |
-          unzip -q ScanTools.zip
-          cd ScanTools
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp src/app/build/outputs/apk/release/app-release.apk Scan-Tools.apk
+          gh release create "v${{ github.run_number }}" Scan-Tools.apk \
+            --title "Scan Tools v${{ github.run_number }}" \
+            --notes "Made by (R.S) - download Scan-Tools.apk and install." \
+            --repo "${{ github.repository }}"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: ScanTools-apk
-          path: ScanTools/app/build/outputs/apk/release/*.apk
+          name: Scan-Tools-apk
+          path: Scan-Tools.apk
